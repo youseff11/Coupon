@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth import authenticate
 from django.db.models import Count, F, Q, Sum
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
@@ -10,7 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .models import Category, Coupon, Store
+from .models import Category, Coupon, Store, StoredFile
 from .serializers import (
     CategorySerializer, CouponSerializer, PublicCouponSerializer,
     StoreDetailSerializer, StoreSerializer,
@@ -89,6 +90,15 @@ def track_copy(request, pk):
     if not updated:
         return Response(status=status.HTTP_404_NOT_FOUND)
     return Response({'ok': True})
+
+
+def serve_stored_file(request, name):
+    obj = StoredFile.objects.filter(name=name).only('content', 'content_type').first()
+    if obj is None:
+        raise Http404
+    response = HttpResponse(bytes(obj.content), content_type=obj.content_type)
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response
 
 
 # ---------- Auth ----------

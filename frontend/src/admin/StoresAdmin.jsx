@@ -12,9 +12,16 @@ const EMPTY = { name: '', slug: '', description: '', website_url: '', category: 
 function LogoInput({ preview, onFile, onRemove }) {
   const ref = useRef(null)
   const [drag, setDrag] = useState(false)
+  const toast = useToast()
 
   const pick = (file) => {
-    if (file && file.type.startsWith('image/')) onFile(file)
+    if (!file || !file.type.startsWith('image/')) return
+    // The host rejects request bodies over ~4.5MB; keep logos small.
+    if (file.size > 2 * 1024 * 1024) {
+      toast('حجم الصورة كبير، الحد الأقصى 2 ميجا', 'error')
+      return
+    }
+    onFile(file)
   }
 
   return (
@@ -31,7 +38,7 @@ function LogoInput({ preview, onFile, onRemove }) {
       )}
       <div className="logo-drop-text">
         <strong>شعار الشركة</strong>
-        <span>اسحب الصورة هنا أو اختر ملفاً (PNG, JPG, SVG — يفضل مربع)</span>
+        <span>اسحب الصورة هنا أو اختر ملفاً (PNG, JPG, SVG — يفضل مربع، حتى 2 ميجا)</span>
         <div className="logo-drop-actions">
           <button type="button" className="btn btn-outline btn-sm" onClick={() => ref.current.click()}>اختيار صورة</button>
           {preview && <button type="button" className="btn btn-ghost btn-sm" onClick={onRemove}>إزالة</button>}

@@ -78,3 +78,15 @@ class Coupon(models.Model):
     @property
     def is_expired(self):
         return bool(self.expires_at and self.expires_at < timezone.localdate())
+
+
+class StoredFile(models.Model):
+    """An uploaded file kept in the database (see coupons.storage.DatabaseStorage)."""
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    content_type = models.CharField(max_length=100)
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name

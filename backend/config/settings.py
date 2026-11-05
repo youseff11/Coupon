@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -21,12 +22,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or 'django-insecure-h3m#%qmx8+eq7#&emrfb90fluv!4_@qk9gyz31-g02i%8*#604'
+# On Vercel the database URL is already a secret, so a key derived from it is
+# used when DJANGO_SECRET_KEY isn't set.
+ON_VERCEL = bool(os.environ.get('VERCEL'))
+DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+SECRET_KEY = (
+    os.environ.get('DJANGO_SECRET_KEY')
+    or (DATABASE_URL and hashlib.sha256(f'django-secret:{DATABASE_URL}'.encode()).hexdigest())
+    or 'django-insecure-h3m#%qmx8+eq7#&emrfb90fluv!4_@qk9gyz31-g02i%8*#604'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
+DEBUG = os.environ.get('DJANGO_DEBUG', '0' if ON_VERCEL else '1') == '1'
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,.vercel.app').split(',')
+
+# Vercel terminates HTTPS in front of the app; trust its header so logo URLs are https.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
@@ -85,6 +97,13 @@ DATABASES = {
     }
 }
 
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=0, ssl_require=True)
+    # Neon's pooled connection goes through PgBouncer.
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
@@ -125,6 +144,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Hosts without a persistent disk (Vercel) keep uploaded logos in the database.
+USE_DB_STORAGE = os.environ.get('USE_DB_STORAGE', '1' if ON_VERCEL else '0') == '1'
+if USE_DB_STORAGE:
+    STORAGES = {
+        'default': {'BACKEND': 'coupons.storage.DatabaseStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
