@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Menu, Search, X, Ticket, Store, Home, Tag } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, Search, X, Ticket, Store, Home, Tag, ChevronLeft } from 'lucide-react'
 import { SITE } from '../config'
 import { useFetch } from './common'
 import CategoryIcon from './CategoryIcon'
@@ -30,64 +31,123 @@ export function Brand({ light, secret }) {
   )
 }
 
+const NAV_LINKS = [
+  { to: '/', label: 'الرئيسية', icon: Home, end: true },
+  { to: '/stores', label: 'المتاجر', icon: Store },
+  { to: '/coupons', label: 'أحدث الكوبونات', icon: Ticket },
+]
+
+// Rendered into <body>: the header's backdrop-filter would otherwise trap this
+// fixed-position panel inside the header's own box.
+function MobileMenu({ open, onClose, onSearch }) {
+  const [q, setQ] = useState('')
+  const { data: cats } = useFetch(open ? '/categories/' : null)
+
+  useEffect(() => {
+    if (!open) return
+    const esc = (e) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', esc)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', esc)
+      document.body.style.overflow = ''
+    }
+  }, [open, onClose])
+
+  const submit = (e) => {
+    e.preventDefault()
+    if (q.trim()) onSearch(q.trim())
+  }
+
+  return createPortal(
+    <>
+      <div className={`drawer-backdrop ${open ? 'show' : ''}`} onClick={onClose} />
+      <aside className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-modal="true" aria-label="القائمة" aria-hidden={!open}>
+        <div className="drawer-head">
+          <Brand />
+          <button className="icon-btn drawer-close" onClick={onClose} aria-label="إغلاق"><X size={20} /></button>
+        </div>
+
+        <div className="drawer-body">
+          <form className="drawer-search" onSubmit={submit}>
+            <Search size={18} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن متجر أو كوبون..." enterKeyHint="search" />
+          </form>
+
+          <nav className="drawer-nav">
+            {NAV_LINKS.map((l) => (
+              <NavLink key={l.to} to={l.to} end={l.end} onClick={onClose}>
+                <span className="drawer-nav-icon"><l.icon size={18} /></span>
+                <span className="drawer-nav-label">{l.label}</span>
+                <ChevronLeft size={16} className="drawer-nav-arrow" />
+              </NavLink>
+            ))}
+          </nav>
+
+          {cats?.length > 0 && (
+            <div className="drawer-section">
+              <div className="drawer-section-title">التصنيفات</div>
+              <div className="drawer-cats">
+                {cats.map((c) => (
+                  <Link key={c.id} to={`/stores?category=${c.slug}`} onClick={onClose} className="drawer-cat">
+                    <CategoryIcon name={c.icon} size={16} /> {c.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="drawer-foot">{SITE.tagline}</div>
+      </aside>
+    </>,
+    document.body,
+  )
+}
+
 function Header() {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const navigate = useNavigate()
+  const { pathname, search } = useLocation()
+  const close = useCallback(() => setOpen(false), [])
 
-  const submit = (e) => {
-    e.preventDefault()
-    if (!q.trim()) return
-    navigate(`/search?q=${encodeURIComponent(q.trim())}`)
+  useEffect(close, [pathname, search, close])
+
+  const goSearch = (term) => {
+    navigate(`/search?q=${encodeURIComponent(term)}`)
     setOpen(false)
   }
 
-  const links = [
-    { to: '/', label: 'الرئيسية', icon: Home, end: true },
-    { to: '/stores', label: 'المتاجر', icon: Store },
-    { to: '/coupons', label: 'أحدث الكوبونات', icon: Ticket },
-  ]
+  const submit = (e) => {
+    e.preventDefault()
+    if (q.trim()) goSearch(q.trim())
+  }
 
   return (
-    <header className="site-header">
-      <div className="container header-inner">
-        <button className="icon-btn only-mobile" onClick={() => setOpen(true)} aria-label="القائمة">
-          <Menu size={22} />
-        </button>
-        <Brand secret />
-        <nav className="main-nav only-desktop">
-          {links.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.end}>{l.label}</NavLink>
-          ))}
-        </nav>
-        <form className="header-search only-desktop" onSubmit={submit}>
-          <Search size={18} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن متجر أو كوبون..." />
-        </form>
-        <button className="icon-btn only-mobile" onClick={() => navigate('/search')} aria-label="بحث">
-          <Search size={22} />
-        </button>
-      </div>
-
-      <div className={`drawer-backdrop ${open ? 'show' : ''}`} onClick={() => setOpen(false)} />
-      <aside className={`drawer ${open ? 'open' : ''}`}>
-        <div className="drawer-head">
-          <Brand />
-          <button className="icon-btn" onClick={() => setOpen(false)} aria-label="إغلاق"><X size={22} /></button>
+    <>
+      <header className="site-header">
+        <div className="container header-inner">
+          <button className="icon-btn only-mobile" onClick={() => setOpen(true)} aria-label="القائمة" aria-expanded={open}>
+            <Menu size={22} />
+          </button>
+          <Brand secret />
+          <nav className="main-nav only-desktop">
+            {NAV_LINKS.map((l) => (
+              <NavLink key={l.to} to={l.to} end={l.end}>{l.label}</NavLink>
+            ))}
+          </nav>
+          <form className="header-search only-desktop" onSubmit={submit}>
+            <Search size={18} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن متجر أو كوبون..." />
+          </form>
+          <button className="icon-btn only-mobile" onClick={() => navigate('/search')} aria-label="بحث">
+            <Search size={22} />
+          </button>
         </div>
-        <form className="header-search" onSubmit={submit}>
-          <Search size={18} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن متجر أو كوبون..." />
-        </form>
-        <nav className="drawer-nav">
-          {links.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.end} onClick={() => setOpen(false)}>
-              <l.icon size={19} /> {l.label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-    </header>
+      </header>
+      <MobileMenu open={open} onClose={close} onSearch={goSearch} />
+    </>
   )
 }
 
