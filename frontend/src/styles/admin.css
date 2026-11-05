@@ -160,11 +160,12 @@
 .switch-row { display: flex; flex-wrap: wrap; gap: 14px 28px; padding: 14px; background: var(--surface-2); border-radius: 12px; }
 
 /* Admin modal + forms */
-.adm-modal { padding: 0; max-width: 520px; display: flex; flex-direction: column; }
+.adm-modal { padding: 0; max-width: 520px; display: flex; flex-direction: column; overflow: hidden; }
 .adm-modal.wide { max-width: 720px; }
 .adm-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--border); }
 .adm-modal-head h3 { font-size: 18px; font-weight: 800; }
-.adm-modal-body { padding: 22px; overflow-y: auto; }
+/* Only the body scrolls, so the save/cancel footer is always visible. */
+.adm-modal-body { padding: 22px; overflow-y: auto; flex: 1; min-height: 0; }
 .adm-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border); background: #fafbfd; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .span-2 { grid-column: 1 / -1; }
@@ -175,9 +176,14 @@
 .alert-danger { background: var(--danger-50); color: var(--danger); border: 1px solid #fecaca; }
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }
-  .adm-modal-backdrop { padding: 0; align-items: end; }
-  .adm-modal, .adm-modal.wide { max-width: none; border-radius: 20px 20px 0 0; max-height: 92vh; }
-  .adm-modal-foot { border-radius: 0; }
+  /* Pinned to the top and clear of the bottom edge, where mobile Safari's toolbar floats over the page. */
+  .adm-modal-backdrop { padding: max(12px, env(safe-area-inset-top)) 10px 0; align-items: start; }
+  .adm-modal, .adm-modal.wide { max-width: none; border-radius: 18px; max-height: calc(100dvh - 110px); }
+  .adm-modal-head { padding: 14px 18px; }
+  .adm-modal-body { padding: 18px; }
+  .adm-modal-foot { padding: 12px 18px; }
+  /* 16px stops iOS Safari from zooming in when a field is focused. */
+  .adm-modal .input, .adm-modal .select, .adm-modal .textarea { font-size: 16px; }
   .adm-modal-foot .btn { flex: 1; }
 }
 
